@@ -1278,7 +1278,9 @@ function WhoStartsApp({ onBack }) {
 
 // ── SELECTOR SCREEN ───────────────────────────────────────────────────
 function GameSelector({ onSelect }) {
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory,  setShowHistory]  = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [importMsg,    setImportMsg]    = useState(null);
 
   const allHistory = () => {
     const groups = loadGroups();
@@ -1288,6 +1290,31 @@ function GameSelector({ onSelect }) {
     });
     return entries.sort((a,b) => new Date(b.date) - new Date(a.date));
   };
+
+  function exportGroups() {
+    const json = localStorage.getItem(KEY_GROUPS) || '[]';
+    const file = new File([json], 'score-keeper-groupes.json', { type: 'application/json' });
+    if (navigator.canShare?.({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Score Keeper — Groupes' }).catch(()=>{});
+    } else {
+      navigator.clipboard?.writeText(json)
+        .then(()=>setImportMsg('✓ Données copiées dans le presse-papiers'))
+        .catch(()=>setImportMsg('Copie impossible — ouvre la console et copie manuellement'));
+    }
+  }
+
+  function importGroups(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const groups = JSON.parse(e.target.result);
+        if (!Array.isArray(groups)) throw new Error();
+        saveGroups(groups);
+        setImportMsg(`✓ ${groups.length} groupe${groups.length>1?'s':''} restauré${groups.length>1?'s':''} !`);
+      } catch { setImportMsg('⚠️ Fichier invalide, rien n\'a été modifié.'); }
+    };
+    reader.readAsText(file);
+  }
 
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",background:"#0a0a0f",color:"#e8e8f0",
@@ -1299,15 +1326,24 @@ function GameSelector({ onSelect }) {
       backgroundImage:"radial-gradient(ellipse at 50% 30%,rgba(120,80,200,.15) 0%,transparent 60%)"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap'); *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}`}</style>
 
-      {/* History button — fixed bottom-right, safe area aware */}
-      <div onClick={()=>setShowHistory(true)} style={{
-        position:"fixed",
-        bottom:"calc(env(safe-area-inset-bottom, 0px) + 20px)",right:20,
-        background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.14)",
-        borderRadius:28,padding:"11px 20px",fontSize:".75rem",color:"rgba(255,255,255,.65)",
-        cursor:"pointer",display:"flex",alignItems:"center",gap:7,letterSpacing:".05em",
-        zIndex:10,boxShadow:"0 4px 24px rgba(0,0,0,.45)",backdropFilter:"blur(8px)"}}>
-        📋 Historique
+      {/* Bottom bar — history (right) + settings (left) */}
+      <div style={{position:"fixed",bottom:"calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        left:0,right:0,display:"flex",justifyContent:"space-between",padding:"0 20px",
+        pointerEvents:"none",zIndex:10}}>
+        <div onClick={()=>setShowSettings(true)} style={{pointerEvents:"auto",
+          background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.14)",
+          borderRadius:28,padding:"11px 20px",fontSize:".75rem",color:"rgba(255,255,255,.65)",
+          cursor:"pointer",display:"flex",alignItems:"center",gap:7,letterSpacing:".05em",
+          boxShadow:"0 4px 24px rgba(0,0,0,.45)",backdropFilter:"blur(8px)"}}>
+          ⚙️ Données
+        </div>
+        <div onClick={()=>setShowHistory(true)} style={{pointerEvents:"auto",
+          background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.14)",
+          borderRadius:28,padding:"11px 20px",fontSize:".75rem",color:"rgba(255,255,255,.65)",
+          cursor:"pointer",display:"flex",alignItems:"center",gap:7,letterSpacing:".05em",
+          boxShadow:"0 4px 24px rgba(0,0,0,.45)",backdropFilter:"blur(8px)"}}>
+          📋 Historique
+        </div>
       </div>
 
       <div style={{fontFamily:"'Cinzel',serif",fontSize:"1rem",fontWeight:700,color:"rgba(255,255,255,.25)",
@@ -1348,6 +1384,65 @@ function GameSelector({ onSelect }) {
           </div>
         ))}
       </div>
+
+      {/* ── SETTINGS SHEET ── */}
+      {showSettings && (
+        <div onClick={e=>{if(e.target===e.currentTarget){setShowSettings(false);setImportMsg(null);}}}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",
+          flexDirection:"column",alignItems:"center",justifyContent:"flex-end",zIndex:50}}>
+          <div style={{background:"#13121a",borderRadius:"20px 20px 0 0",border:"1px solid rgba(255,255,255,.08)",
+            width:"100%",display:"flex",flexDirection:"column"}}>
+            <div style={{width:36,height:4,background:"rgba(255,255,255,.15)",borderRadius:2,margin:"10px auto 8px"}}/>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+              padding:"0 16px 12px",borderBottom:"1px solid rgba(255,255,255,.07)"}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:".95rem",color:"#fff"}}>⚙️ Données & sauvegarde</span>
+              <div onClick={()=>{setShowSettings(false);setImportMsg(null);}}
+                style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",
+                borderRadius:8,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>✕</div>
+            </div>
+            <div style={{padding:"16px 18px 32px",display:"flex",flexDirection:"column",gap:10}}>
+
+              {/* Info tip */}
+              <div style={{background:"rgba(99,179,237,.08)",border:"1px solid rgba(99,179,237,.2)",
+                borderRadius:12,padding:"12px 14px",fontSize:".75rem",color:"rgba(255,255,255,.55)",lineHeight:1.6}}>
+                💡 <strong style={{color:"rgba(99,179,237,.9)"}}>Pas besoin de supprimer l'app pour la mettre à jour.</strong>
+                {" "}Ferme-la complètement (swipe dans l'app switcher) et rouvre-la — la mise à jour s'applique automatiquement.
+              </div>
+
+              {/* Export */}
+              <div onClick={exportGroups}
+                style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.12)",
+                borderRadius:14,padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+                <span style={{fontSize:"1.6rem"}}>📤</span>
+                <div>
+                  <div style={{fontWeight:700,fontSize:".9rem",marginBottom:3}}>Exporter mes groupes</div>
+                  <div style={{fontSize:".72rem",color:"rgba(255,255,255,.4)"}}>Partage un fichier .json vers Fichiers, AirDrop, Messages…</div>
+                </div>
+              </div>
+
+              {/* Import */}
+              <label style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.12)",
+                borderRadius:14,padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+                <span style={{fontSize:"1.6rem"}}>📥</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:".9rem",marginBottom:3}}>Importer des groupes</div>
+                  <div style={{fontSize:".72rem",color:"rgba(255,255,255,.4)"}}>Sélectionne le fichier .json précédemment exporté</div>
+                </div>
+                <input type="file" accept=".json,application/json" style={{display:"none"}}
+                  onChange={e=>{if(e.target.files?.[0]) importGroups(e.target.files[0]);}}/>
+              </label>
+
+              {/* Feedback message */}
+              {importMsg && (
+                <div style={{textAlign:"center",fontSize:".8rem",padding:"10px",
+                  color: importMsg.startsWith('✓') ? "#4ade80" : "#f87171"}}>
+                  {importMsg}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── HISTORY OVERLAY ── */}
       {showHistory && (()=>{
