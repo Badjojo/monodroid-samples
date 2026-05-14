@@ -29,6 +29,8 @@ jobs:
         working-directory: OdinScoreKeeper
       - run: npm run build
         working-directory: OdinScoreKeeper
+        env:
+          VITE_BASE_PATH: /monodroid-samples/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: OdinScoreKeeper/dist
