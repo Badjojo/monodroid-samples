@@ -1285,6 +1285,8 @@ function GameSelector({ onSelect }) {
   const [showHistory,  setShowHistory]  = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [importMsg,    setImportMsg]    = useState(null);
+  const [updateMsg,    setUpdateMsg]    = useState(null);
+  const [updating,     setUpdating]     = useState(false);
 
   const allHistory = () => {
     const groups = loadGroups();
@@ -1294,6 +1296,42 @@ function GameSelector({ onSelect }) {
     });
     return entries.sort((a,b) => new Date(b.date) - new Date(a.date));
   };
+
+  async function checkUpdate() {
+    setUpdating(true); setUpdateMsg(null);
+    try {
+      if (!('serviceWorker' in navigator)) {
+        setUpdateMsg('⚠️ Service Worker non supporté ici — recharge manuellement.');
+        setUpdating(false); return;
+      }
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) { window.location.reload(); return; }
+
+      // Listen for a new SW becoming active, then reload
+      const onControllerChange = () => window.location.reload();
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+
+      await reg.update(); // fetch latest SW from server
+
+      if (reg.waiting) {
+        // New SW already waiting — activate it immediately
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      } else if (reg.installing) {
+        // Still installing — wait for it then activate
+        reg.installing.addEventListener('statechange', e => {
+          if (e.target.state === 'installed') e.target.postMessage({ type: 'SKIP_WAITING' });
+        });
+      } else {
+        // Nothing new found — already up to date
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+        setUpdateMsg('✓ Vous avez déjà la dernière version !');
+        setUpdating(false);
+      }
+    } catch(e) {
+      setUpdateMsg('⚠️ Impossible de vérifier — vérifie ta connexion.');
+      setUpdating(false);
+    }
+  }
 
   function exportGroups() {
     const json = localStorage.getItem(KEY_GROUPS) || '[]';
@@ -1391,7 +1429,7 @@ function GameSelector({ onSelect }) {
 
       {/* ── SETTINGS SHEET ── */}
       {showSettings && (
-        <div onClick={e=>{if(e.target===e.currentTarget){setShowSettings(false);setImportMsg(null);}}}
+        <div onClick={e=>{if(e.target===e.currentTarget){setShowSettings(false);setImportMsg(null);setUpdateMsg(null);}}}
           style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",
           flexDirection:"column",alignItems:"center",justifyContent:"flex-end",zIndex:50}}>
           <div style={{background:"#13121a",borderRadius:"20px 20px 0 0",border:"1px solid rgba(255,255,255,.08)",
@@ -1400,18 +1438,33 @@ function GameSelector({ onSelect }) {
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
               padding:"0 16px 12px",borderBottom:"1px solid rgba(255,255,255,.07)"}}>
               <span style={{fontFamily:"'Cinzel',serif",fontSize:".95rem",color:"#fff"}}>⚙️ Données & sauvegarde</span>
-              <div onClick={()=>{setShowSettings(false);setImportMsg(null);}}
+              <div onClick={()=>{setShowSettings(false);setImportMsg(null);setUpdateMsg(null);}}
                 style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",
                 borderRadius:8,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>✕</div>
             </div>
             <div style={{padding:"16px 18px 32px",display:"flex",flexDirection:"column",gap:10}}>
 
-              {/* Info tip */}
-              <div style={{background:"rgba(99,179,237,.08)",border:"1px solid rgba(99,179,237,.2)",
-                borderRadius:12,padding:"12px 14px",fontSize:".75rem",color:"rgba(255,255,255,.55)",lineHeight:1.6}}>
-                💡 <strong style={{color:"rgba(99,179,237,.9)"}}>Pas besoin de supprimer l'app pour la mettre à jour.</strong>
-                {" "}Ferme-la complètement (swipe dans l'app switcher) et rouvre-la — la mise à jour s'applique automatiquement.
+              {/* Update */}
+              <div onClick={updating ? undefined : checkUpdate}
+                style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.12)",
+                borderRadius:14,padding:"16px 18px",cursor:updating?"default":"pointer",
+                display:"flex",alignItems:"center",gap:14,opacity:updating?.6:1}}>
+                <span style={{fontSize:"1.6rem"}}>{updating?"⏳":"🔄"}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:".9rem",marginBottom:3}}>
+                    {updating?"Vérification en cours…":"Charger la dernière version"}
+                  </div>
+                  <div style={{fontSize:".72rem",color:"rgba(255,255,255,.4)"}}>
+                    Vérifie et installe la mise à jour, puis recharge l'app
+                  </div>
+                </div>
               </div>
+              {updateMsg && (
+                <div style={{textAlign:"center",fontSize:".8rem",padding:"4px 10px",
+                  color:updateMsg.startsWith('✓')?"#4ade80":"#f87171"}}>
+                  {updateMsg}
+                </div>
+              )}
 
               {/* Export */}
               <div onClick={exportGroups}
