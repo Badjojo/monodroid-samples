@@ -215,7 +215,9 @@ function GameApp({ gameId, onBack }) {
       display:"flex", flexDirection:"column", position:"relative",
       backgroundImage:`radial-gradient(ellipse at 50% 0%,${G.colorDim} 0%,transparent 55%)` },
     topBar: { display:"flex", alignItems:"center", justifyContent:"space-between",
-      padding:"8px 14px 7px", borderBottom:`1px solid ${G.border}`, gap:10, flexShrink:0 },
+      paddingTop:"max(8px, env(safe-area-inset-top, 0px))", paddingBottom:"7px",
+      paddingLeft:"14px", paddingRight:"14px",
+      borderBottom:`1px solid ${G.border}`, gap:10, flexShrink:0 },
     topTitle: { fontFamily:"'Cinzel',serif", fontSize:"1.05rem", fontWeight:900, color:G.accent, letterSpacing:".06em", flex:1 },
     backBtn: { background:G.surface2, border:`1px solid ${G.border}`, borderRadius:8, padding:"5px 12px",
       fontSize:".75rem", color:G.sub, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" },
@@ -406,13 +408,13 @@ function GameApp({ gameId, onBack }) {
 
   return (
     <div style={S.root}>
-      {toast && <div style={{position:"fixed",top:8,left:"50%",transform:"translateX(-50%)",
+      {toast && <div style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 8px)",left:"50%",transform:"translateX(-50%)",
         background:G.btnBg,color:G.btnColor,fontSize:".68rem",letterSpacing:".08em",
         padding:"5px 16px",borderRadius:20,zIndex:99,whiteSpace:"nowrap",pointerEvents:"none",opacity:.92}}>✓ Sauvegardé</div>}
 
       {/* ── HOME ── */}
       {screen==="home" && <>
-        <div style={{textAlign:"center",padding:"16px 16px 10px",flexShrink:0}}>
+        <div style={{textAlign:"center",paddingTop:"max(16px, env(safe-area-inset-top, 0px))",paddingLeft:16,paddingRight:16,paddingBottom:10,flexShrink:0}}>
           <div onClick={onBack} style={{display:"inline-block",background:G.surface2,border:`1px solid ${G.border}`,
             borderRadius:8,padding:"4px 12px",fontSize:".7rem",color:G.sub,cursor:"pointer",marginBottom:10}}>← Changer de jeu</div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"2rem",fontWeight:900,color:G.accent,letterSpacing:".1em"}}>{G.emoji} {G.label.toUpperCase()}</div>
