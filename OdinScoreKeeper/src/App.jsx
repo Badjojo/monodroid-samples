@@ -193,6 +193,9 @@ function GameApp({ gameId, onBack }) {
   const [editState, setEditState] = useState(null);
   const [quickState, setQuickState] = useState(null);
   const [pastGroupId, setPastGroupId] = useState(null);
+  const [directEdit, setDirectEdit]   = useState(null);
+  const [directVal,  setDirectVal]    = useState("");
+  const [statsGrpId, setStatsGrpId]   = useState(null);
 
   const persist = useCallback((next) => {
     saveGroups(next.groups);
@@ -370,6 +373,34 @@ function GameApp({ gameId, onBack }) {
 
   function goHome(){setShowWin(false);setSheet(null);setScreen("home");}
 
+  function applyDirect(i) {
+    const v = parseInt(directVal, 10);
+    if (!isNaN(v)) {
+      update(a => {
+        const minVal = gameId==="skyjo" ? -99 : 0;
+        a.activeGame.current[i] = Math.max(minVal, v);
+        return a;
+      });
+    }
+    setDirectEdit(null); setDirectVal("");
+  }
+
+  function shareResult() {
+    if (!g) return;
+    const ranked = [...g.players.map((name,i)=>({name,score:g.totals[i]}))];
+    ranked.sort((a,b)=>G.winMode==="lowest"?a.score-b.score:b.score-a.score);
+    const text = `${G.emoji} ${G.label} — ${ranked[0].name} gagne !\n`
+      + ranked.map((r,idx)=>`${MEDALS[idx]} ${r.name}: ${r.score}pts`).join("\n")
+      + `\n${roundNum} ${roundLabel.toLowerCase()}${roundNum>1?"s":""}`;
+    if (navigator.share) {
+      navigator.share({ title:`${G.label} — Score Keeper`, text });
+    } else {
+      navigator.clipboard?.writeText(text)
+        .then(()=>{setToast(true);setTimeout(()=>setToast(false),1600);})
+        .catch(()=>{});
+    }
+  }
+
   const roundNum = g ? (g.tour||g.manche||1) : 1;
   const roundLabel = gameId==="flip7" ? "Tour" : "Manche";
 
@@ -403,6 +434,7 @@ function GameApp({ gameId, onBack }) {
               </div>
               <div style={{display:"flex",gap:6,flexShrink:0}} onClick={e=>e.stopPropagation()}>
                 {grp.pastGames?.length>0 && <div style={S.iconBtn} onClick={()=>{setPastGroupId(grp.id);setSheet("past");}}>🏆</div>}
+                <div style={S.iconBtn} onClick={()=>{setStatsGrpId(grp.id);setSheet("stats");}}>📊</div>
                 <div style={S.iconBtn} onClick={()=>openEditGroup(grp.id)}>✏️</div>
               </div>
             </div>
@@ -544,10 +576,23 @@ function GameApp({ gameId, onBack }) {
                         border:"1px solid rgba(196,74,58,.3)",background:"rgba(196,74,58,.15)",color:"#ff8070",
                         fontSize:"1.2rem",display:"flex",alignItems:"center",justifyContent:"center",
                         cursor:"pointer",userSelect:"none",flexShrink:0}}>−</div>
-                      <div style={{flex:1,textAlign:"center"}}>
-                        <div style={{fontFamily:"'Cinzel',serif",fontSize:"1.4rem",fontWeight:700,lineHeight:1}}>{cur}</div>
-                        <div style={{fontSize:".5rem",color:G.sub,letterSpacing:".08em",textTransform:"uppercase"}}>
-                          {gameId==="flip7"?"ce tour":"cette manche"}</div>
+                      <div style={{flex:1,textAlign:"center"}} onClick={()=>{if(directEdit===null){setDirectEdit(i);setDirectVal(String(cur));}}}>
+                        {directEdit===i
+                          ? <input type="number" autoFocus value={directVal}
+                              onChange={e=>setDirectVal(e.target.value)}
+                              onBlur={()=>applyDirect(i)}
+                              onKeyDown={e=>{if(e.key==="Enter")applyDirect(i);if(e.key==="Escape"){setDirectEdit(null);setDirectVal("");}}}
+                              style={{width:"100%",background:"transparent",border:"none",
+                                borderBottom:`2px solid ${G.accent}`,outline:"none",
+                                fontFamily:"'Cinzel',serif",fontSize:"1.4rem",fontWeight:700,
+                                lineHeight:1,color:G.accent,textAlign:"center",padding:"2px 0"}}/>
+                          : <>
+                              <div style={{fontFamily:"'Cinzel',serif",fontSize:"1.4rem",fontWeight:700,
+                                lineHeight:1,cursor:"text",borderBottom:`1px dashed ${G.border}`}}>{cur}</div>
+                              <div style={{fontSize:".5rem",color:G.sub,letterSpacing:".08em",textTransform:"uppercase"}}>
+                                {gameId==="flip7"?"ce tour":"cette manche"}</div>
+                            </>
+                        }
                       </div>
                       <div onClick={()=>adjustScore(i,+1)} style={{width:32,height:32,borderRadius:8,
                         border:"1px solid rgba(74,154,106,.3)",background:"rgba(74,154,106,.15)",color:"#6dcc90",
@@ -707,6 +752,118 @@ function GameApp({ gameId, onBack }) {
         );
       })()}
 
+      {/* ── SHEET: STATS ── */}
+      {sheet==="stats" && statsGrpId && (()=>{
+        const grp = data.groups.find(x=>x.id===statsGrpId);
+        if (!grp) return null;
+        const overall = {};
+        (grp.pastGames||[]).forEach(pg=>{
+          (pg.scores||[]).forEach(s=>{
+            if(!overall[s.name]) overall[s.name]={games:0,wins:0};
+            overall[s.name].games++;
+            if(s.name===pg.winner) overall[s.name].wins++;
+          });
+        });
+        const players = Object.entries(overall).sort((a,b)=>b[1].wins-a[1].wins);
+        return (
+          <div onClick={e=>{if(e.target===e.currentTarget){setSheet(null);setStatsGrpId(null);}}}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",
+            flexDirection:"column",alignItems:"center",justifyContent:"flex-end",zIndex:10}}>
+            <div style={{background:G.surface,borderRadius:"20px 20px 0 0",border:`1px solid ${G.border}`,
+              width:"100%",maxHeight:"82%",display:"flex",flexDirection:"column"}}>
+              <div style={{width:36,height:4,background:G.border,borderRadius:2,margin:"10px auto 8px",flexShrink:0}}/>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                padding:"0 16px 10px",flexShrink:0,borderBottom:`1px solid ${G.border}`}}>
+                <span style={{fontFamily:"'Cinzel',serif",fontSize:".95rem",color:G.accent}}>📊 Stats — {grp.name}</span>
+                <div style={S.iconBtn} onClick={()=>{setSheet(null);setStatsGrpId(null);}}>✕</div>
+              </div>
+              <div style={{overflowY:"auto",flex:1,padding:"10px 14px 24px"}}>
+                {players.length===0
+                  ? <div style={{color:G.sub,textAlign:"center",padding:20}}>Aucune partie enregistrée</div>
+                  : <>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:".78rem",marginBottom:18}}>
+                        <thead><tr>
+                          <th style={{color:G.sub,fontWeight:400,textAlign:"left",padding:"5px 6px",
+                            borderBottom:`1px solid ${G.border}`,fontSize:".58rem",letterSpacing:".1em"}}>JOUEUR</th>
+                          <th style={{color:G.sub,fontWeight:400,padding:"5px 6px",
+                            borderBottom:`1px solid ${G.border}`,fontSize:".58rem",letterSpacing:".1em"}}>PARTIES</th>
+                          <th style={{color:G.sub,fontWeight:400,padding:"5px 6px",
+                            borderBottom:`1px solid ${G.border}`,fontSize:".58rem",letterSpacing:".1em"}}>🏆</th>
+                          <th style={{color:G.sub,fontWeight:400,padding:"5px 6px",
+                            borderBottom:`1px solid ${G.border}`,fontSize:".58rem",letterSpacing:".1em"}}>VICTOIRES</th>
+                        </tr></thead>
+                        <tbody>
+                          {players.map(([name,st])=>{
+                            const pct = Math.round(st.wins/st.games*100);
+                            const ci = grp.players.indexOf(name);
+                            return (
+                              <tr key={name}>
+                                <td style={{padding:"7px 6px",borderBottom:`1px solid ${G.surface2}`}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                    <div style={{width:8,height:8,borderRadius:"50%",
+                                      background:COLORS[(ci>=0?ci:0)%COLORS.length],flexShrink:0}}/>
+                                    <span style={{fontFamily:"'Cinzel',serif",fontSize:".82rem",fontWeight:700}}>{name}</span>
+                                  </div>
+                                </td>
+                                <td style={{padding:"7px 6px",borderBottom:`1px solid ${G.surface2}`,textAlign:"center",color:G.sub}}>{st.games}</td>
+                                <td style={{padding:"7px 6px",borderBottom:`1px solid ${G.surface2}`,textAlign:"center",
+                                  color:G.accent,fontWeight:700,fontFamily:"'Cinzel',serif"}}>{st.wins}</td>
+                                <td style={{padding:"7px 6px",borderBottom:`1px solid ${G.surface2}`}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                    <div style={{flex:1,height:4,background:G.surface2,borderRadius:2,overflow:"hidden"}}>
+                                      <div style={{height:"100%",borderRadius:2,width:`${pct}%`,background:G.color,transition:"width .3s"}}/>
+                                    </div>
+                                    <span style={{color:G.text,fontSize:".7rem",minWidth:"3.5ch",textAlign:"right"}}>{pct}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      {Object.entries(GAMES).map(([gid,Gx])=>{
+                        const gh=(grp.pastGames||[]).filter(pg=>pg.gameId===gid);
+                        if(!gh.length) return null;
+                        const pp={};
+                        gh.forEach(pg=>{
+                          (pg.scores||[]).forEach(s=>{
+                            if(!pp[s.name]) pp[s.name]={games:0,wins:0,scores:[]};
+                            pp[s.name].games++; pp[s.name].scores.push(s.score);
+                            if(s.name===pg.winner) pp[s.name].wins++;
+                          });
+                        });
+                        const sorted=Object.entries(pp).sort((a,b)=>b[1].wins-a[1].wins);
+                        return (
+                          <div key={gid} style={{marginBottom:14}}>
+                            <div style={{fontSize:".6rem",letterSpacing:".15em",textTransform:"uppercase",
+                              color:G.sub,marginBottom:6,display:"flex",alignItems:"center",gap:5}}>
+                              <span>{Gx.emoji}</span><span>{Gx.label}</span>
+                              <span style={{opacity:.5}}>({gh.length} partie{gh.length>1?"s":""})</span>
+                            </div>
+                            {sorted.map(([name,st])=>{
+                              const avg=Math.round(st.scores.reduce((a,b)=>a+b,0)/st.scores.length);
+                              return (
+                                <div key={name} style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                                  padding:"5px 2px",borderBottom:`1px solid ${G.surface2}`}}>
+                                  <span style={{fontSize:".78rem",fontWeight:600}}>{name}</span>
+                                  <div style={{display:"flex",gap:14,fontSize:".7rem",color:G.sub}}>
+                                    <span><strong style={{color:G.accent}}>{st.wins}</strong> 🏆</span>
+                                    <span>moy. <strong style={{color:G.text}}>{avg}</strong> pts</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </>
+                }
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── WIN SCREEN ── */}
       {showWin && g && (()=>{
         const ranked=[...g.players.map((name,i)=>({name,score:g.totals[i]}))];
@@ -727,6 +884,7 @@ function GameApp({ gameId, onBack }) {
                 </div>
               ))}
             </div>
+            <Btn ghost G={G} style={{padding:"10px 22px",fontSize:".9rem",marginBottom:12}} onClick={shareResult}>📤 Partager les résultats</Btn>
             <div style={{display:"flex",gap:12}}>
               <Btn ghost G={G} style={{padding:"12px 22px",fontSize:".9rem"}} onClick={()=>{update(a=>{a.activeGame=null;return a;});goHome();}}>🏠 Accueil</Btn>
               <Btn primary G={G} style={{padding:"12px 22px",fontSize:".9rem"}} onClick={rejouer}>🔄 Rejouer</Btn>
