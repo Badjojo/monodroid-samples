@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
 
 // ── CONSTANTS ────────────────────────────────────────────────────────
-const KEY_ODIN  = "odin-v6";
-const KEY_FLIP7 = "flip7-v2";
+const KEY_ODIN   = "odin-v6";
+const KEY_FLIP7  = "flip7-v2";
 const KEY_SKYJO  = "skyjo-v1";
+const KEY_GROUPS = "scorekeeper-groups-v1";
 const COLORS  = ["#ff6e6c","#67d5b5","#f7c59f","#c3aed6","#5eb8ff","#ffd166"];
 const MEDALS  = ["🥇","🥈","🥉","4e","5e","6e"];
 const genId   = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
@@ -79,27 +80,41 @@ const GAMES = {
 };
 
 // ── STORAGE ──────────────────────────────────────────────────────────
-const defaultData = (gameId) => {
-  const G = GAMES[gameId];
-  return {
-    groups: [{
-      id: genId(),
-      name: gameId === "odin" ? "Weekend" : gameId === "skyjo" ? "Pluvigner" : "Boulot",
-      players: gameId === "odin"
-        ? ["Véronique","Johan","Maxime","Florine","Amélie","Julien"]
-        : gameId === "skyjo"
-        ? ["Johan","Amélie","Michel","Anne"]
-        : ["Johan","Amélie","Claire"],
-      [G.goalKey]: G.defaultLimit,
-      pastGames: [],
-    }],
-    activeGame: null,
-  };
-};
+const DEFAULT_LIMITS = { odin: 15, flip7: 200, skyjo: 100 };
+
+function defaultGroups() {
+  return [{
+    id: genId(),
+    name: "Weekend",
+    players: ["Véronique","Johan","Maxime","Florine","Amélie","Julien"],
+    limits: { ...DEFAULT_LIMITS },
+    pastGames: [],
+  }];
+}
+
+function loadGroups() {
+  try { const r = localStorage.getItem(KEY_GROUPS); if (r) return JSON.parse(r); } catch(e) {}
+  return defaultGroups();
+}
+
+function saveGroups(groups) {
+  try { localStorage.setItem(KEY_GROUPS, JSON.stringify(groups)); } catch(e) {}
+}
+
+function loadActiveGame(gameId) {
+  try {
+    const r = localStorage.getItem(GAMES[gameId].key);
+    if (r) { const d = JSON.parse(r); return d.activeGame || null; }
+  } catch(e) {}
+  return null;
+}
+
+function saveActiveGame(gameId, activeGame) {
+  try { localStorage.setItem(GAMES[gameId].key, JSON.stringify({ activeGame })); } catch(e) {}
+}
 
 function loadData(gameId) {
-  try { const r = localStorage.getItem(GAMES[gameId].key); if (r) return JSON.parse(r); } catch(e) {}
-  return defaultData(gameId);
+  return { groups: loadGroups(), activeGame: loadActiveGame(gameId) };
 }
 
 // ── SHARED UI ────────────────────────────────────────────────────────
@@ -157,9 +172,10 @@ function GameApp({ gameId, onBack }) {
   const [pastGroupId, setPastGroupId] = useState(null);
 
   const persist = useCallback((next) => {
-    try { localStorage.setItem(G.key, JSON.stringify(next)); } catch(e){}
+    saveGroups(next.groups);
+    saveActiveGame(gameId, next.activeGame);
     setToast(true); setTimeout(()=>setToast(false), 1600);
-  }, [G.key]);
+  }, [gameId]);
 
   const update = useCallback((fn) => {
     setData(prev => { const next=fn(JSON.parse(JSON.stringify(prev))); persist(next); return next; });
@@ -167,7 +183,6 @@ function GameApp({ gameId, onBack }) {
 
   const g = data.activeGame;
   const gameGroupName = g?.groupId ? (data.groups.find(x=>x.id===g.groupId)?.name||G.label) : "Partie rapide";
-  const goalKey = G.goalKey;
 
   const S = {
     root: { fontFamily:"'DM Sans',sans-serif", background:G.bg, color:G.text, width:"100%", minHeight:"100vh",
@@ -185,12 +200,16 @@ function GameApp({ gameId, onBack }) {
       display:"flex", alignItems:"center", justifyContent:"center", fontSize:".9rem", cursor:"pointer", flexShrink:0 },
   };
 
+  function getGroupLimit(grp) {
+    return grp.limits?.[gameId] ?? G.defaultLimit;
+  }
+
   function startGroupGame(groupId) {
     if (data.activeGame?.groupId===groupId) {
       if (window.confirm("Une partie est en cours. La reprendre ?")) { setScreen("game"); return; }
     }
     const grp = data.groups.find(x=>x.id===groupId);
-    const limit = grp[goalKey];
+    const limit = getGroupLimit(grp);
     update(a => {
       a.activeGame = { groupId, players:[...grp.players], limit,
         tour:1, manche:1, totals:grp.players.map(()=>0),
@@ -205,16 +224,25 @@ function GameApp({ gameId, onBack }) {
 
   function openEditGroup(id) {
     const grp = id ? data.groups.find(x=>x.id===id) : null;
-    setEditState({ id, name:grp?.name||"", players:grp?[...grp.players]:["",""], limit:grp?.[goalKey]||G.defaultLimit });
+    setEditState({
+      id,
+      name: grp?.name||"",
+      players: grp ? [...grp.players] : ["",""],
+      limits: grp?.limits ? {...grp.limits} : {...DEFAULT_LIMITS},
+    });
     setScreen("editGroup");
   }
   function saveGroup() {
-    const {id,name,players,limit}=editState;
+    const {id,name,players,limits}=editState;
     const n=name.trim(); if(!n){alert("Donne un nom au groupe !");return;}
     const pl=players.map(p=>p.trim()).filter(p=>p.length>0); if(pl.length<2){alert("Il faut au moins 2 joueurs !");return;}
     update(a=>{
-      if(id){const grp=a.groups.find(x=>x.id===id);grp.name=n;grp.players=pl;grp[goalKey]=limit;}
-      else a.groups.push({id:genId(),name:n,players:pl,[goalKey]:limit,pastGames:[]});
+      if(id){
+        const grp=a.groups.find(x=>x.id===id);
+        grp.name=n; grp.players=pl; grp.limits=limits;
+      } else {
+        a.groups.push({id:genId(),name:n,players:pl,limits:{...limits},pastGames:[]});
+      }
       return a;
     });
     setScreen("home");
@@ -247,12 +275,8 @@ function GameApp({ gameId, onBack }) {
       return a;
     });
   }
-  function toggleFlip7(i){
-    update(a=>{a.activeGame.flip7[i]=!a.activeGame.flip7[i];return a;});
-  }
-  function toggleDouble(i){
-    update(a=>{a.activeGame.doubled[i]=!a.activeGame.doubled[i];return a;});
-  }
+  function toggleFlip7(i){ update(a=>{a.activeGame.flip7[i]=!a.activeGame.flip7[i];return a;}); }
+  function toggleDouble(i){ update(a=>{a.activeGame.doubled[i]=!a.activeGame.doubled[i];return a;}); }
 
   function getRankIcon(idx){
     if(!g) return "";
@@ -286,9 +310,12 @@ function GameApp({ gameId, onBack }) {
             const winnerIdx = G.winMode==="lowest"
               ? g.totals.indexOf(Math.min(...g.totals))
               : g.totals.indexOf(Math.max(...g.totals));
-            grp.pastGames.unshift({date:g.startedAt,rounds:g.tour||g.manche,
+            grp.pastGames.unshift({
+              gameId,
+              date:g.startedAt, rounds:g.tour||g.manche,
               winner:g.players[winnerIdx],
-              scores:g.players.map((name,i)=>({name,score:g.totals[i]}))});
+              scores:g.players.map((name,i)=>({name,score:g.totals[i]}))
+            });
             if(grp.pastGames.length>20)grp.pastGames=grp.pastGames.slice(0,20);
           }
         }
@@ -348,7 +375,7 @@ function GameApp({ gameId, onBack }) {
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontFamily:"'Cinzel',serif",fontSize:"1rem",fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{grp.name}</div>
                 <div style={{fontSize:".68rem",color:G.sub,marginTop:2}}>
-                  {grp.players.length} joueurs · {G.limitLabel.toLowerCase()} {grp[goalKey]} pts
+                  {grp.players.length} joueurs · {G.limitLabel.toLowerCase()} {getGroupLimit(grp)} pts
                   {grp.pastGames?.length?` · ${grp.pastGames.length} partie${grp.pastGames.length>1?"s":""} jouée${grp.pastGames.length>1?"s":""}`:""}</div>
               </div>
               <div style={{display:"flex",gap:6,flexShrink:0}} onClick={e=>e.stopPropagation()}>
@@ -384,11 +411,27 @@ function GameApp({ gameId, onBack }) {
             onChange={e=>setEditState(s=>({...s,name:e.target.value}))}
             style={{background:G.surface2,border:`1px solid ${G.border}`,borderRadius:10,padding:"10px 14px",
             width:"100%",color:G.text,fontFamily:"'Cinzel',serif",fontSize:"1rem",outline:"none",marginBottom:14}}/>
-          <div style={S.sLabel}>{G.limitLabel}</div>
-          <LimitCtrl G={G} value={editState.limit} label={G.limitLabel}
-            onChange={v=>setEditState(s=>({...s,limit:v}))}
-            min={G.limitMin} max={G.limitMax} step={G.limitStep}/>
-          <div style={S.sLabel}>Joueurs <span style={{color:G.sub}}>(2 à 6)</span></div>
+
+          <div style={S.sLabel}>Limites par jeu</div>
+          {Object.entries(GAMES).map(([gid, Gx])=>(
+            <div key={gid} style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+              background:G.surface2,border:`1px solid ${G.border}`,borderRadius:10,padding:"10px 14px",marginBottom:8}}>
+              <span style={{fontSize:".85rem",color:G.text}}>{Gx.emoji} {Gx.label} <span style={{fontSize:".7rem",color:G.sub}}>— {Gx.limitLabel}</span></span>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div onClick={()=>setEditState(s=>({...s,limits:{...s.limits,[gid]:Math.max(Gx.limitMin,(s.limits[gid]??Gx.defaultLimit)-Gx.limitStep)}}))}
+                  style={{background:G.surface,border:`1px solid ${G.border}`,borderRadius:6,width:28,height:28,
+                  display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",userSelect:"none"}}>−</div>
+                <span style={{fontFamily:"'Cinzel',serif",fontSize:"1rem",color:Gx.accent,minWidth:"3.5ch",textAlign:"center"}}>
+                  {editState.limits[gid]??Gx.defaultLimit}
+                </span>
+                <div onClick={()=>setEditState(s=>({...s,limits:{...s.limits,[gid]:Math.min(Gx.limitMax,(s.limits[gid]??Gx.defaultLimit)+Gx.limitStep)}}))}
+                  style={{background:G.surface,border:`1px solid ${G.border}`,borderRadius:6,width:28,height:28,
+                  display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",userSelect:"none"}}>＋</div>
+              </div>
+            </div>
+          ))}
+
+          <div style={{...S.sLabel,marginTop:10}}>Joueurs <span style={{color:G.sub}}>(2 à 6)</span></div>
           {editState.players.map((name,i)=>(
             <PlayerEditRow key={i} name={name} index={i}
               onChange={v=>setEditState(s=>{const p=[...s.players];p[i]=v;return{...s,players:p};})}
@@ -459,7 +502,6 @@ function GameApp({ gameId, onBack }) {
                 opacity:isOut?.5:1}}>
                 <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,
                   borderRadius:"14px 0 0 14px",background:COLORS[i%COLORS.length]}}/>
-
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <span style={{fontFamily:"'Cinzel',serif",fontSize:".9rem",fontWeight:700}}>{name}</span>
@@ -468,12 +510,10 @@ function GameApp({ gameId, onBack }) {
                   <span style={{fontFamily:"'Cinzel',serif",fontSize:"1.5rem",fontWeight:900,
                     color:danger?G.accent:G.text,lineHeight:1}}>{total}</span>
                 </div>
-
                 <div style={{width:"100%",height:4,background:G.surface2,borderRadius:2,overflow:"hidden",marginBottom:8}}>
                   <div style={{height:"100%",borderRadius:2,width:`${pct}%`,transition:"width .35s",
                     background:danger?G.color:`${G.color}66`}}/>
                 </div>
-
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   <div style={{display:"flex",flexDirection:"column",gap:4,flex:1}}>
                     <div style={{display:"flex",alignItems:"center",gap:4}}>
@@ -505,7 +545,6 @@ function GameApp({ gameId, onBack }) {
                       ))}
                     </div>
                   </div>
-
                   {gameId==="flip7" && (
                     <div onClick={()=>toggleFlip7(i)}
                       style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,
@@ -530,7 +569,6 @@ function GameApp({ gameId, onBack }) {
                       </span>
                     </div>
                   )}
-
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0,minWidth:44}}>
                     <div style={{fontFamily:"'Cinzel',serif",fontSize:"1rem",fontWeight:700,lineHeight:1,
                       color:doubled?"#f87171":f7?"#f6c90e":G.accent}}>
@@ -619,14 +657,17 @@ function GameApp({ gameId, onBack }) {
                 {!grp?.pastGames?.length
                   ? <div style={{color:G.sub,textAlign:"center",padding:20}}>Aucune partie enregistrée</div>
                   : grp.pastGames.map((pg,pi)=>{
+                      const pgGame = GAMES[pg.gameId] || G;
                       const ds=new Date(pg.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"});
-                      const sorted=[...pg.scores].sort((a,b)=>G.winMode==="lowest"?a.score-b.score:b.score-a.score);
+                      const sorted=[...pg.scores].sort((a,b)=>pgGame.winMode==="lowest"?a.score-b.score:b.score-a.score);
                       const sc=sorted.map((s,i)=>`${MEDALS[i]} ${s.name} ${s.score}pts`).join(" · ");
                       return (
                         <div key={pi} style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",
                           padding:"8px 0",borderBottom:`1px solid ${G.surface2}`,gap:8}}>
                           <div>
-                            <div style={{fontFamily:"'Cinzel',serif",fontSize:".82rem",color:G.accent}}>🏆 {pg.winner}</div>
+                            <div style={{fontFamily:"'Cinzel',serif",fontSize:".82rem",color:pgGame.accent}}>
+                              {pgGame.emoji} {pg.winner}
+                            </div>
                             <div style={{fontSize:".63rem",color:G.sub,marginTop:2,lineHeight:1.5}}>{sc}</div>
                           </div>
                           <div style={{flexShrink:0,textAlign:"right"}}>
@@ -687,7 +728,6 @@ function GameSelector({ onSelect }) {
       <div style={{fontFamily:"'Cinzel',serif",fontSize:"2rem",fontWeight:900,color:"#fff",
         letterSpacing:".1em",marginBottom:6}}>Quel jeu ?</div>
       <div style={{color:"rgba(255,255,255,.35)",fontSize:".75rem",marginBottom:40}}>Choisis ton jeu pour commencer</div>
-
       <div style={{display:"flex",flexDirection:"column",gap:14,width:"100%",maxWidth:320}}>
         {Object.entries(GAMES).map(([id,G])=>(
           <div key={id} onClick={()=>onSelect(id)}
