@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 const KEY_ODIN   = "odin-v6";
 const KEY_FLIP7  = "flip7-v2";
 const KEY_SKYJO  = "skyjo-v1";
+const KEY_RDN    = "rdn-v1";
 const KEY_GROUPS = "scorekeeper-groups-v1";
 const COLORS  = ["#ff6e6c","#67d5b5","#f7c59f","#c3aed6","#5eb8ff","#ffd166"];
 const MEDALS  = ["🥇","🥈","🥉","4e","5e","6e"];
@@ -77,10 +78,32 @@ const GAMES = {
     winMode: "lowest",
     hasDouble: true,
   },
+  rdn: {
+    key: KEY_RDN,
+    label: "Roi des Nains",
+    emoji: "👑",
+    color: "#16a34a",
+    colorDim: "rgba(22,163,74,.12)",
+    border: "#1a3020",
+    surface: "#0f1f14",
+    surface2: "#162a1b",
+    bg: "#091410",
+    text: "#e8f5ec",
+    sub: "#5a9a6a",
+    accent: "#4ade80",
+    btnBg: "#16a34a",
+    btnColor: "#091410",
+    desc: "Le moins de points gagne\nÉliminé quand la limite est atteinte",
+    defaultLimit: 40,
+    limitLabel: "Éliminé à partir de",
+    limitMin: 10, limitMax: 100, limitStep: 5,
+    goalKey: "limit",
+    winMode: "lowest",
+  },
 };
 
 // ── STORAGE ──────────────────────────────────────────────────────────
-const DEFAULT_LIMITS = { odin: 15, flip7: 200, skyjo: 100 };
+const DEFAULT_LIMITS = { odin: 15, flip7: 200, skyjo: 100, rdn: 40 };
 
 function defaultGroups() {
   return [{
@@ -1094,24 +1117,58 @@ function WhoStartsApp({ onBack }) {
 
 // ── SELECTOR SCREEN ───────────────────────────────────────────────────
 function GameSelector({ onSelect }) {
+  const [showHistory, setShowHistory] = useState(false);
+
+  const allHistory = () => {
+    const groups = loadGroups();
+    const entries = [];
+    groups.forEach(grp => {
+      (grp.pastGames||[]).forEach(pg => entries.push({ ...pg, groupName: grp.name }));
+    });
+    return entries.sort((a,b) => new Date(b.date) - new Date(a.date));
+  };
+
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",background:"#0a0a0f",color:"#e8e8f0",
       width:"100%",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",
-      justifyContent:"center",padding:30,
+      justifyContent:"center",padding:"30px 30px 50px",
       backgroundImage:"radial-gradient(ellipse at 50% 30%,rgba(120,80,200,.15) 0%,transparent 60%)"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap'); *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}`}</style>
+
+      {/* History button */}
+      <div onClick={()=>setShowHistory(true)} style={{position:"fixed",top:16,right:16,
+        background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,
+        padding:"7px 14px",fontSize:".72rem",color:"rgba(255,255,255,.5)",cursor:"pointer",
+        display:"flex",alignItems:"center",gap:6,letterSpacing:".05em",zIndex:10}}>
+        📋 Historique
+      </div>
+
       <div style={{fontFamily:"'Cinzel',serif",fontSize:"1rem",fontWeight:700,color:"rgba(255,255,255,.25)",
         letterSpacing:".3em",textTransform:"uppercase",marginBottom:8}}>Score Keeper</div>
       <div style={{fontFamily:"'Cinzel',serif",fontSize:"2rem",fontWeight:900,color:"#fff",
         letterSpacing:".1em",marginBottom:6}}>Quel jeu ?</div>
-      <div style={{color:"rgba(255,255,255,.35)",fontSize:".75rem",marginBottom:40}}>Choisis ton jeu pour commencer</div>
+      <div style={{color:"rgba(255,255,255,.35)",fontSize:".75rem",marginBottom:32}}>Choisis ton jeu pour commencer</div>
+
       <div style={{display:"flex",flexDirection:"column",gap:14,width:"100%",maxWidth:320}}>
+        {/* Qui commence — premier */}
+        <div onClick={()=>onSelect("whoStarts")}
+          style={{background:"linear-gradient(135deg,#1a1a2e 0%,#0d0d1a 100%)",border:"1px solid #e6394644",
+          borderRadius:20,padding:"20px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:16,
+          boxShadow:"0 4px 24px rgba(230,57,70,.1)"}}>
+          <div style={{fontSize:"2.8rem",flexShrink:0,lineHeight:1}}>🎲</div>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:"1.3rem",fontWeight:900,color:"#e63946",letterSpacing:".06em"}}>QUI COMMENCE ?</div>
+            <div style={{fontSize:".7rem",color:"rgba(255,255,255,.4)",marginTop:4}}>Doigts sur l'écran ou roulette de noms</div>
+          </div>
+          <div style={{color:"#e63946",fontSize:"1.2rem",flexShrink:0,opacity:.6}}>›</div>
+        </div>
+
+        {/* Games */}
         {Object.entries(GAMES).map(([id,G])=>(
           <div key={id} onClick={()=>onSelect(id)}
             style={{background:`linear-gradient(135deg,${G.surface} 0%,${G.bg} 100%)`,
             border:`1px solid ${G.color}44`,borderRadius:20,padding:"20px 24px",cursor:"pointer",
-            display:"flex",alignItems:"center",gap:16,
-            boxShadow:`0 4px 24px ${G.colorDim}`,transition:"transform .15s,box-shadow .15s"}}>
+            display:"flex",alignItems:"center",gap:16,boxShadow:`0 4px 24px ${G.colorDim}`}}>
             <div style={{fontSize:"2.8rem",flexShrink:0,lineHeight:1}}>{G.emoji}</div>
             <div style={{flex:1}}>
               <div style={{fontFamily:"'Cinzel',serif",fontSize:"1.3rem",fontWeight:900,
@@ -1123,18 +1180,56 @@ function GameSelector({ onSelect }) {
             <div style={{color:G.accent,fontSize:"1.2rem",flexShrink:0,opacity:.6}}>›</div>
           </div>
         ))}
-        <div onClick={()=>onSelect("whoStarts")}
-          style={{background:"linear-gradient(135deg,#1a1a2e 0%,#0d0d1a 100%)",border:"1px solid #e6394644",
-          borderRadius:20,padding:"20px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:16,
-          boxShadow:"0 4px 24px rgba(230,57,70,.1)",transition:"transform .15s"}}>
-          <div style={{fontSize:"2.8rem",flexShrink:0,lineHeight:1}}>🎲</div>
-          <div style={{flex:1}}>
-            <div style={{fontFamily:"'Cinzel',serif",fontSize:"1.3rem",fontWeight:900,color:"#e63946",letterSpacing:".06em"}}>QUI COMMENCE ?</div>
-            <div style={{fontSize:".7rem",color:"rgba(255,255,255,.4)",marginTop:4}}>Doigts sur l'écran ou roulette de noms</div>
-          </div>
-          <div style={{color:"#e63946",fontSize:"1.2rem",flexShrink:0,opacity:.6}}>›</div>
-        </div>
       </div>
+
+      {/* ── HISTORY OVERLAY ── */}
+      {showHistory && (()=>{
+        const history = allHistory();
+        return (
+          <div onClick={e=>{if(e.target===e.currentTarget)setShowHistory(false);}}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",
+            flexDirection:"column",alignItems:"center",justifyContent:"flex-end",zIndex:50}}>
+            <div style={{background:"#13121a",borderRadius:"20px 20px 0 0",border:"1px solid rgba(255,255,255,.08)",
+              width:"100%",maxHeight:"82%",display:"flex",flexDirection:"column"}}>
+              <div style={{width:36,height:4,background:"rgba(255,255,255,.15)",borderRadius:2,margin:"10px auto 8px",flexShrink:0}}/>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                padding:"0 16px 12px",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,.07)"}}>
+                <span style={{fontFamily:"'Cinzel',serif",fontSize:".95rem",color:"#fff"}}>📋 Toutes les parties</span>
+                <div onClick={()=>setShowHistory(false)} style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",
+                  borderRadius:8,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>✕</div>
+              </div>
+              <div style={{overflowY:"auto",flex:1,padding:"8px 14px 24px"}}>
+                {history.length===0
+                  ? <div style={{color:"rgba(255,255,255,.3)",textAlign:"center",padding:30,fontSize:".85rem"}}>Aucune partie enregistrée</div>
+                  : history.map((pg,i)=>{
+                      const pgGame = GAMES[pg.gameId];
+                      const ds = new Date(pg.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"});
+                      const sorted = [...pg.scores].sort((a,b)=> pgGame?.winMode==="lowest" ? a.score-b.score : b.score-a.score);
+                      return (
+                        <div key={i} style={{padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,.05)",display:"flex",alignItems:"flex-start",gap:10}}>
+                          <div style={{fontSize:"1.3rem",flexShrink:0,marginTop:2}}>{pgGame?.emoji||"🎮"}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                              <span style={{fontFamily:"'Cinzel',serif",fontSize:".82rem",color:pgGame?.accent||"#fff",fontWeight:700}}>🏆 {pg.winner}</span>
+                              <span style={{fontSize:".62rem",color:"rgba(255,255,255,.25)",background:"rgba(255,255,255,.06)",borderRadius:4,padding:"2px 6px"}}>{pg.groupName}</span>
+                            </div>
+                            <div style={{fontSize:".63rem",color:"rgba(255,255,255,.35)",lineHeight:1.6}}>
+                              {sorted.map((s,j)=>`${MEDALS[j]} ${s.name} ${s.score}pts`).join(" · ")}
+                            </div>
+                          </div>
+                          <div style={{flexShrink:0,textAlign:"right"}}>
+                            <div style={{fontSize:".6rem",color:"rgba(255,255,255,.3)"}}>{ds}</div>
+                            <div style={{fontSize:".58rem",color:"rgba(255,255,255,.2)"}}>{pg.rounds} tour{pg.rounds>1?"s":""}</div>
+                          </div>
+                        </div>
+                      );
+                    })
+                }
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
