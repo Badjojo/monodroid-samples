@@ -5,9 +5,12 @@ import { execSync } from 'child_process'
 
 function getVersion() {
   try {
-    const count = execSync('git rev-list --count HEAD').toString().trim()
     const hash  = execSync('git rev-parse --short HEAD').toString().trim()
-    return `#${count} · ${hash}`
+    // GITHUB_RUN_NUMBER est auto-incrémenté par GitHub Actions à chaque déploiement.
+    // En local, fallback sur le nombre de commits (clone complet).
+    const build = process.env.GITHUB_RUN_NUMBER
+      ?? execSync('git rev-list --count HEAD').toString().trim()
+    return `#${build} · ${hash}`
   } catch { return 'dev' }
 }
 

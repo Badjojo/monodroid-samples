@@ -1307,23 +1307,25 @@ function GameSelector({ onSelect }) {
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) { window.location.reload(); return; }
 
-      // Listen for a new SW becoming active, then reload
-      const onControllerChange = () => window.location.reload();
-      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+      // controllerchange = nouveau SW actif → recharge
+      const reload = () => window.location.reload();
+      navigator.serviceWorker.addEventListener('controllerchange', reload);
 
       await reg.update(); // fetch latest SW from server
 
       if (reg.waiting) {
-        // New SW already waiting — activate it immediately
         reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        // Fallback : iOS ne déclenche pas toujours controllerchange
+        setTimeout(reload, 1500);
       } else if (reg.installing) {
-        // Still installing — wait for it then activate
         reg.installing.addEventListener('statechange', e => {
-          if (e.target.state === 'installed') e.target.postMessage({ type: 'SKIP_WAITING' });
+          if (e.target.state === 'installed') {
+            e.target.postMessage({ type: 'SKIP_WAITING' });
+            setTimeout(reload, 1500);
+          }
         });
       } else {
-        // Nothing new found — already up to date
-        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+        navigator.serviceWorker.removeEventListener('controllerchange', reload);
         setUpdateMsg('✓ Vous avez déjà la dernière version !');
         setUpdating(false);
       }
