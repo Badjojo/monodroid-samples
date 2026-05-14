@@ -1107,7 +1107,8 @@ function WhoStartsApp({ onBack }) {
 
   const backBtn = (dark) => (
     <div onClick={()=>{ if(mode==="hub") onBack(); else setMode("hub"); }}
-      style={{position:"fixed",top:48,left:16,background:dark?"rgba(26,26,46,.1)":"rgba(255,255,255,.13)",
+      style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 14px)",left:16,
+      background:dark?"rgba(26,26,46,.1)":"rgba(255,255,255,.13)",
       backdropFilter:"blur(8px)",borderRadius:100,padding:"9px 16px",fontSize:13,fontWeight:700,
       color:dark?"#1a1a2e":"white",cursor:"pointer",letterSpacing:1,zIndex:999,userSelect:"none"}}>← Retour</div>
   );
@@ -1193,7 +1194,7 @@ function WhoStartsApp({ onBack }) {
       {/* Setup */}
       {wSub==="setup" && (
         <div style={{display:"flex",flexDirection:"column",height:"100%",background:"#f5f0e8",color:"#1a1a2e",touchAction:"auto"}}>
-          <div style={{padding:"52px 28px 20px",background:"#1a1a2e",flexShrink:0,position:"relative"}}>
+          <div style={{paddingTop:"calc(env(safe-area-inset-top, 0px) + 14px)",paddingLeft:28,paddingRight:28,paddingBottom:20,background:"#1a1a2e",flexShrink:0,position:"relative"}}>
             {backBtn(false)}
             <div style={{paddingLeft:80}}>
               <div style={{fontSize:32,fontWeight:800,color:"#f5f0e8",letterSpacing:-1,lineHeight:1}}>Qui <span style={{color:"#e63946"}}>commence ?</span></div>
@@ -1289,15 +1290,21 @@ function GameSelector({ onSelect }) {
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",background:"#0a0a0f",color:"#e8e8f0",
       width:"100%",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",
-      justifyContent:"center",padding:"30px 30px 50px",
+      justifyContent:"center",
+      paddingTop:"max(30px, env(safe-area-inset-top, 0px))",
+      paddingLeft:"30px",paddingRight:"30px",
+      paddingBottom:"max(100px, calc(env(safe-area-inset-bottom, 0px) + 90px))",
       backgroundImage:"radial-gradient(ellipse at 50% 30%,rgba(120,80,200,.15) 0%,transparent 60%)"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap'); *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}`}</style>
 
-      {/* History button */}
-      <div onClick={()=>setShowHistory(true)} style={{position:"fixed",top:16,right:16,
-        background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,
-        padding:"7px 14px",fontSize:".72rem",color:"rgba(255,255,255,.5)",cursor:"pointer",
-        display:"flex",alignItems:"center",gap:6,letterSpacing:".05em",zIndex:10}}>
+      {/* History button — fixed bottom-right, safe area aware */}
+      <div onClick={()=>setShowHistory(true)} style={{
+        position:"fixed",
+        bottom:"calc(env(safe-area-inset-bottom, 0px) + 20px)",right:20,
+        background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.14)",
+        borderRadius:28,padding:"11px 20px",fontSize:".75rem",color:"rgba(255,255,255,.65)",
+        cursor:"pointer",display:"flex",alignItems:"center",gap:7,letterSpacing:".05em",
+        zIndex:10,boxShadow:"0 4px 24px rgba(0,0,0,.45)",backdropFilter:"blur(8px)"}}>
         📋 Historique
       </div>
 
