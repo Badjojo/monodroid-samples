@@ -414,13 +414,20 @@ function GameApp({ gameId, onBack }) {
 
       {/* ── HOME ── */}
       {screen==="home" && <>
-        <div style={{textAlign:"center",paddingTop:"max(16px, env(safe-area-inset-top, 0px))",paddingLeft:16,paddingRight:16,paddingBottom:10,flexShrink:0}}>
-          <div onClick={onBack} style={{display:"inline-block",background:G.surface2,border:`1px solid ${G.border}`,
-            borderRadius:8,padding:"4px 12px",fontSize:".7rem",color:G.sub,cursor:"pointer",marginBottom:10}}>← Changer de jeu</div>
+        {/* Back button — fixed bottom-left */}
+        <div onClick={onBack} style={{position:"fixed",
+          bottom:"calc(env(safe-area-inset-bottom, 0px) + 20px)",left:20,
+          background:G.surface2,border:`1px solid ${G.border}`,borderRadius:28,
+          padding:"11px 20px",fontSize:".75rem",color:G.sub,cursor:"pointer",
+          display:"flex",alignItems:"center",gap:7,zIndex:10,
+          boxShadow:"0 4px 24px rgba(0,0,0,.45)",backdropFilter:"blur(8px)"}}>
+          ← Changer de jeu
+        </div>
+        <div style={{textAlign:"center",paddingTop:"max(20px, env(safe-area-inset-top, 0px))",paddingLeft:16,paddingRight:16,paddingBottom:10,flexShrink:0}}>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"2rem",fontWeight:900,color:G.accent,letterSpacing:".1em"}}>{G.emoji} {G.label.toUpperCase()}</div>
           <div style={{color:G.sub,fontSize:".62rem",letterSpacing:".2em",textTransform:"uppercase",marginTop:2}}>Score Keeper</div>
         </div>
-        <div style={S.scroll}>
+        <div style={{...S.scroll,paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 80px)"}}>
           <div style={S.sLabel}>Mes groupes</div>
           {data.groups.length===0 && <div style={{color:G.sub,fontSize:".8rem",textAlign:"center",padding:"14px 0"}}>Aucun groupe — crée-en un !</div>}
           {data.groups.map((grp,gi)=>(
@@ -458,9 +465,7 @@ function GameApp({ gameId, onBack }) {
       {/* ── EDIT GROUP ── */}
       {screen==="editGroup" && editState && <>
         <div style={S.topBar}>
-          <button style={S.backBtn} onClick={()=>setScreen("home")}>← Retour</button>
           <div style={S.topTitle}>{editState.id?"Modifier":"Nouveau groupe"}</div>
-          <div style={{width:60}}/>
         </div>
         <div style={S.scroll}>
           <div style={S.sLabel}>Nom du groupe</div>
@@ -498,6 +503,7 @@ function GameApp({ gameId, onBack }) {
           {editState.players.length<6 && <Btn ghost full G={G} onClick={()=>setEditState(s=>({...s,players:[...s.players,""]}))}>＋ Ajouter un joueur</Btn>}
         </div>
         <div style={S.footer}>
+          <Btn ghost G={G} onClick={()=>setScreen("home")}>← Retour</Btn>
           {editState.id && <Btn ghost G={G} onClick={deleteGroup}>🗑</Btn>}
           <Btn primary G={G} style={{flex:1}} onClick={saveGroup}>Enregistrer</Btn>
         </div>
@@ -506,9 +512,7 @@ function GameApp({ gameId, onBack }) {
       {/* ── QUICK SETUP ── */}
       {screen==="quickSetup" && quickState && <>
         <div style={S.topBar}>
-          <button style={S.backBtn} onClick={()=>setScreen("home")}>← Retour</button>
           <div style={S.topTitle}>Partie rapide</div>
-          <div style={{width:60}}/>
         </div>
         <div style={S.scroll}>
           <div style={S.sLabel}>{G.limitLabel}</div>
@@ -525,14 +529,14 @@ function GameApp({ gameId, onBack }) {
           {quickState.players.length<6 && <Btn ghost full G={G} onClick={()=>setQuickState(s=>({...s,players:[...s.players,""]}))}>＋ Ajouter un joueur</Btn>}
         </div>
         <div style={S.footer}>
-          <Btn primary full G={G} onClick={startQuickGame}>{G.emoji} Commencer</Btn>
+          <Btn ghost G={G} onClick={()=>setScreen("home")}>← Retour</Btn>
+          <Btn primary G={G} style={{flex:1}} onClick={startQuickGame}>{G.emoji} Commencer</Btn>
         </div>
       </>}
 
       {/* ── GAME ── */}
       {screen==="game" && g && <>
         <div style={S.topBar}>
-          <button style={S.backBtn} onClick={()=>{if(window.confirm("Quitter la partie ?"))goHome();}}>← Quitter</button>
           <div style={S.topTitle}>{G.emoji} {gameGroupName}</div>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
             <div style={{background:G.surface2,border:`1px solid ${G.border}`,borderRadius:8,padding:"4px 10px",
@@ -655,7 +659,7 @@ function GameApp({ gameId, onBack }) {
         </div>
 
         <div style={S.footer}>
-          <Btn ghost sm G={G} onClick={()=>setSheet("history")}>Historique</Btn>
+          <Btn ghost G={G} onClick={()=>{if(window.confirm("Quitter la partie ?"))goHome();}}>← Quitter</Btn>
           <Btn primary G={G} style={{flex:1}} onClick={validerRound}>{G.emoji} Valider {roundLabel.toLowerCase()}</Btn>
         </div>
       </>}
