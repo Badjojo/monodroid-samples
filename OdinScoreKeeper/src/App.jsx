@@ -1438,6 +1438,9 @@ function GameSelector({ onSelect }) {
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
               padding:"0 16px 12px",borderBottom:"1px solid rgba(255,255,255,.07)"}}>
               <span style={{fontFamily:"'Cinzel',serif",fontSize:".95rem",color:"#fff"}}>⚙️ Données & sauvegarde</span>
+              <div style={{fontSize:".62rem",color:"rgba(255,255,255,.2)",letterSpacing:".08em"}}>
+                Version {__APP_VERSION__} — {__BUILD_DATE__}
+              </div>
               <div onClick={()=>{setShowSettings(false);setImportMsg(null);setUpdateMsg(null);}}
                 style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",
                 borderRadius:8,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>✕</div>
